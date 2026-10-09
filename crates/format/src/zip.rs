@@ -307,6 +307,14 @@ mod tests {
         assert_eq!(archive.read_by_name("manifest.json", usize::MAX).unwrap(), content);
         assert_eq!(archive.read_by_name("manifest.json", content.len()).unwrap(), content);
         assert!(matches!(archive.read_by_name("manifest.json", content.len() - 1), Err(FormatError::LimitExceeded(_))));
+
+        // A tiny archive with a forged 4 GiB size must be rejected without
+        // trying to allocate its claimed output capacity in advance.
+        let mut forged = bytes;
+        forged[22..26].copy_from_slice(&u32::MAX.to_le_bytes());
+        forged[central + 24..central + 28].copy_from_slice(&u32::MAX.to_le_bytes());
+        let archive = ZipReader::new(&forged).unwrap();
+        assert!(matches!(archive.read_by_name("manifest.json", usize::MAX), Err(FormatError::Corrupt(_))));
     }
 
     #[test]
