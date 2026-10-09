@@ -212,7 +212,7 @@ impl<'a> ZipReader<'a> {
             8 => {
                 let mut out = Vec::with_capacity(e.uncompressed);
                 flate2::read::DeflateDecoder::new(raw)
-                    .take(max as u64 + 1)
+                    .take((max as u64).saturating_add(1))
                     .read_to_end(&mut out)
                     .map_err(|err| FormatError::corrupt(format!("zip entry `{}`: {err}", e.name)))?;
                 out
