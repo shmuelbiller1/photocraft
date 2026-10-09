@@ -1768,7 +1768,8 @@ fn outer_glow_does_not_paint_through_a_zero_fill_layer() {
     let rect = Rect::new(24, 24, 72, 72);
     for technique in [GlowTechnique::Softer, GlowTechnique::Precise] {
         let mut d = doc_white(96, 96);
-        d.layers[0].surface_mut().unwrap().fill_rect(d.bounds(), &background);
+        let bounds = d.bounds();
+        d.layers[0].surface_mut().unwrap().fill_rect(bounds, &background);
         let mut layer = solid_layer("glow", rect, [1.0, 0.92, 0.25, 1.0]);
         layer.fill_opacity = 0.0;
         layer.effects.items.push(Effect::OuterGlow(Glow {
