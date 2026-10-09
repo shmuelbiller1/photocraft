@@ -210,7 +210,9 @@ impl<'a> ZipReader<'a> {
         let data = match e.method {
             0 => raw.to_vec(),
             8 => {
-                let mut out = Vec::with_capacity(e.uncompressed);
+                // The uncompressed length comes from an untrusted ZIP header: a
+                // small forged archive must not reserve gigabytes up front.
+                let mut out = Vec::new();
                 flate2::read::DeflateDecoder::new(raw)
                     .take((max as u64).saturating_add(1))
                     .read_to_end(&mut out)
