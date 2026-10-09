@@ -211,8 +211,9 @@ impl<'a> ZipReader<'a> {
             0 => raw.to_vec(),
             8 => {
                 // The uncompressed length comes from an untrusted ZIP header: a
-                // small forged archive must not reserve gigabytes up front.
-                let mut out = Vec::new();
+                // small forged archive must not reserve gigabytes up front, so the
+                // preallocation is capped (DEFLATE expands at most ~1032x).
+                let mut out = Vec::with_capacity(e.uncompressed.min(raw.len().saturating_mul(1032)).min(64 << 20));
                 flate2::read::DeflateDecoder::new(raw)
                     .take((max as u64).saturating_add(1))
                     .read_to_end(&mut out)
