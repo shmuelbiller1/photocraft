@@ -1019,7 +1019,21 @@ impl<'a> Planner<'a> {
         for &(i, e) in &rev {
             if let Effect::OuterGlow(g) = e {
                 let paint = self.glow_paint(g, anchor);
-                w = self.paint(w, content, Cov::Map(map(i, 0), 0.0), &paint, g.common.blend, g.common.opacity, 0, clip, sb);
+                // Match CPU exterior knockout: a see-through fill must not reveal the
+                // glow through its own shape. The shader applies m × (1 − alpha × k).
+                let see_through = 1.0 - layer.fill_opacity.clamp(0.0, 1.0);
+                w = self.paint_k(
+                    w,
+                    content,
+                    Cov::Map(map(i, 0), 0.0),
+                    &paint,
+                    g.common.blend,
+                    g.common.opacity,
+                    F_KNOCKOUT,
+                    clip,
+                    sb,
+                    see_through,
+                );
             }
         }
 
