@@ -271,6 +271,42 @@ mod tests {
         assert!(r.read_by_name("a", 100).is_err());
     }
 
+    /// A valid DEFLATE-compressed bundle may be read with an effectively
+    /// unlimited caller budget (e.g. corruption/round-trip checks). On 64-bit
+    /// targets `usize::MAX as u64 + 1` overflows, so the decoder must saturate.
+    #[test]
+    fn deflated_entry_with_unbounded_limit_round_trips() {
+        use std::io::Write as _;
+
+        let content = b"DEFLATE-compressed PhotoCraft project content, with a valid CRC.";
+        let mut encoder = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(content).unwrap();
+        let compressed = encoder.finish().unwrap();
+
+        // Construct a standards-conforming DEFLATE entry from the store-only
+        // writer: keep its actual compressed bytes, but set the ZIP method,
+        // original length and CRC in *both* the local and central headers.
+        let mut writer = ZipWriter::new();
+        writer.add("manifest.json", &compressed).unwrap();
+        let mut bytes = writer.finish().unwrap();
+        let eocd = bytes.len() - 22;
+        let central = u32_at(&bytes, eocd + 16).unwrap() as usize;
+        let crc = crc32(content).to_le_bytes();
+        let length = (content.len() as u32).to_le_bytes();
+
+        bytes[8..10].copy_from_slice(&8u16.to_le_bytes());
+        bytes[14..18].copy_from_slice(&crc);
+        bytes[22..26].copy_from_slice(&length);
+        bytes[central + 10..central + 12].copy_from_slice(&8u16.to_le_bytes());
+        bytes[central + 16..central + 20].copy_from_slice(&crc);
+        bytes[central + 24..central + 28].copy_from_slice(&length);
+
+        let archive = ZipReader::new(&bytes).unwrap();
+        assert_eq!(archive.read_by_name("manifest.json", usize::MAX).unwrap(), content);
+        assert_eq!(archive.read_by_name("manifest.json", content.len()).unwrap(), content);
+        assert!(matches!(archive.read_by_name("manifest.json", content.len() - 1), Err(FormatError::LimitExceeded(_))));
+    }
+
     #[test]
     fn offset_access_rejects_overflow() {
         assert!(u16_at(&[], usize::MAX).is_err());
