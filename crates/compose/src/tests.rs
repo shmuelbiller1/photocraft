@@ -1759,7 +1759,6 @@ fn clipped_brightness_and_desaturation_whiten_a_lighter_color_logo() {
     assert!(close4(px(&d, 1, 0), yellow), "the yellow beside it is untouched");
 }
 
-
 #[test]
 fn outer_glow_does_not_paint_through_a_zero_fill_layer() {
     use photocraft_doc::{Contour, Effect, FxCommon, FxPaint, Glow, GlowSource, GlowTechnique};
