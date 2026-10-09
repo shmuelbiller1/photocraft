@@ -467,12 +467,13 @@ impl Ex {
                 let styled = src.and_then(|d| crate::text_styles_map::export_tysh(d, t, &self.text_styles, self.dpi)).map(std::sync::Arc::new);
                 // `TextIndex` names the layer's object in the document's `Txt2` (where the
                 // auto-kern mode lives); left at 0, every type layer would claim object 0 (#1348).
-                // Only data this export re-serializes is patched — a new layer's `TySh` or one
-                // restamped with style sheets — so a preserved `TySh` round-trips byte-for-byte
-                // (`corpus_tysh_lossless`) while its own `TextIndex` already names its `Txt2` slot.
+                // Keep an unchanged preserved TySh byte-for-byte (corpus_tysh_lossless).
+                // Duplicate or out-of-range file TextIndex values must be renumbered,
+                // however, even when no style sheet needed rebuilding: otherwise two
+                // layers may read the same Txt2 object and acquire the wrong kerning.
                 let idx = self.text_index.get(&l.id).copied().unwrap_or(0);
-                let fresh =
-                    styled.as_ref().or(generated.as_ref()).and_then(|d| photocraft_text::psd::set_text_index(d.as_slice(), idx)).map(std::sync::Arc::new);
+                let rewrite = styled.as_ref().or(generated.as_ref()).or_else(|| src.filter(|d| photocraft_text::psd::text_index(d.as_slice()) != Some(idx)));
+                let fresh = rewrite.and_then(|d| photocraft_text::psd::set_text_index(d.as_slice(), idx)).map(std::sync::Arc::new);
                 set_principal(&mut raw, &[b"TySh"], fresh.as_ref().or(styled.as_ref().or(src)));
                 if !raw.iter().any(|(k, _)| k == b"TySh") {
                     self.warnings.push(format!("layer \"{}\": text layer written as pixels (no TySh data)", l.name));
